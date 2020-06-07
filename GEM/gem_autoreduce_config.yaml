@@ -1,0 +1,15 @@
+user_name: autoreduce
+
+# Replace these with the relevant paths on the autoreduce server
+# They have to be created manually, but you only have to do it once
+calibration_directory: '\\isis\inst$\NDXGEM\user\scripts\autoreduction\Calibration'
+output_directory: 'C:\Users\hvq65228\Documents\GEM DATA\Test'
+calibration_mapping_file: '\\isis\inst$\NDXGEM\user\scripts\autoreduction\gem_cycle_mapping.yaml'
+
+# Correction and input mode flags
+# do_absorb_corrections may well want to be True, but it slows down the scripts a lot (and appears to be broken on GEM)
+do_absorb_corrections: False
+vanadium_normalisation: True
+input_mode: Summed
+mode: PDF
+multiple_scattering: False

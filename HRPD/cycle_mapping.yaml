@@ -1,0 +1,35 @@
+68236-68735:
+  "coupled":
+    "10-110":
+      vanadium_run_numbers: 68250
+      empty_run_numbers: 68255
+    "100-200":
+      vanadium_run_numbers: 68252
+      empty_run_numbers: 68257
+    "10-50":
+      vanadium_run_numbers: 68254
+      empty_run_numbers: 68258
+    "180-280":
+      vanadium_run_numbers: 68253
+      empty_run_numbers: 68266
+  label: "17_2"
+  offset_file_name: "hrpd_new_072_01_corr.cal"
+  
+66027-66828:
+  "coupled":
+    "10-50":
+      vanadium_run_numbers: 66647
+      empty_run_numbers: 66679
+  label: "16_5"
+  offset_file_name: "hrpd_new_072_01_corr.cal"
+  
+68737-:
+    label: "17_3"
+    offset_file_name: "hrpd_new_072_01_corr.cal"
+    "coupled":
+        "30-130":
+            vanadium_run_numbers: 68742
+            empty_run_numbers: "68739,68755"
+        "100-200":
+            vanadium_run_numbers: 68743
+            empty_run_numbers: 68740
