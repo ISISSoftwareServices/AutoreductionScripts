@@ -1,14 +1,14 @@
-import numpy as np # Required due to Mantid4.0 import issue
-import sys
 import os
+import sys
 import shutil
-from isis_powder import HRPD
-sys.path.append("/isis/NDXHRPD/user/scripts/autoreduction")
+import time
+sys.path.append("/isis/NDXOSIRIS/user/scripts/autoreduction") 
 import reduce_vars as web_var
 
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+import numpy as np
 
 def validate(file, dir):
     """
@@ -28,7 +28,7 @@ def validate(file, dir):
         if not os.path.isdir(dir):
             raise RuntimeError("Unable to find directory: {}".format(dir))
     print("Validation successful")
-
+        
 
 def main(input_file, output_dir):
     """
@@ -64,9 +64,10 @@ def main(input_file, output_dir):
         title='About as simple as it gets, folks')
     ax.grid()
 
-    fig.savefig(os.path.join(output_dir, "TEST_PLOT.png"), dpi=None)
+    fig.savefig(os.path.join(output_dir, "TEST_PLOT.png"), dpi=None)	
 
     # And of course, here and below insert your reduction code!
+
 
 if __name__ == "__main__":
     main("some input file", "some output dir")
