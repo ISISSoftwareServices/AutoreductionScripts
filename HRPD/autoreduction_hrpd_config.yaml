@@ -1,9 +1,0 @@
-user_name: 'autoreduce'
-
-calibration_directory: '\\isis\inst$\NDXHRPD\user\scripts\autoreduction\Calibration'
-output_directory: 'P:\JoeRamsay\autoreduce\HRPD\Output'
-calibration_mapping_file: '\\isis\inst$\NDXHRPD\user\scripts\autoreduction\autoreduction_cycle_mapping.yaml'
-
-do_absorb_corrections: False
-
-vanadium_normalisation: True
