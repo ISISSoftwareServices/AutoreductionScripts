@@ -3,8 +3,8 @@ standard_vars = {
     'SampleTRANS': None,
     'CanSANS': None,
     'CanTRANS': None,
-    'EmptyBeamTRANS': 51526,
-    'UserFile': 'USER_Jones_202B_Changer_r51526.txt',
+    'EmptyBeamTRANS': 56068,
+    'UserFile': 'USER_Jones_203A_Changer_r56068.txt',
     'RBNumber': 2010389
 }
 advanced_vars={

@@ -25,9 +25,9 @@ import reduce_vars as web_var
 
 # set
 inst='LARMOR'
-cycle='20_2'
+cycle='20_3'
 wavs=[1.0,3.0,5.0,7.0,9.0,11.0,13.0]
-maskfile='USER_Jones_202B_Changer_r51526.txt'
+maskfile='USER_Jones_203A_Changer_r56068.txt'
 
 def validate(input_file, output_dir):
     """
@@ -125,6 +125,11 @@ def main(input_file, output_dir):
         debug+='\nuserfile='+userfile+'\ninstrument='+inst+'\ncycle='+cycle
         debug+='\nwl_range='+str(advanced_params['wl_ranges'])+'\noutputdir='+output_dir
         print(debug,file=open(os.path.join(output_dir,'debug.txt'),'w'))
+    else:
+        # print a diagnostic string to a file
+        debug='This was a TRANS run so there is nothing to output'
+        print(debug,file=open(os.path.join(output_dir,'debug.txt'),'w'))
+        
 
 #========================================================================================
 # Now the functions that actually do the reduction and plotting
@@ -145,6 +150,7 @@ def setDataSearchPath():
     # on the headless server running autoreduction
     ConfigService.setDataSearchDirs( \
     prefix+"/NDX"+inst+"/User/Users/Masks/;"+ \
+    prefix+"/NDX"+inst+"/Instrument/data/cycle_20_2/"+ \
     prefix+"/NDX"+inst+"/Instrument/data/cycle_"+cycle+"/")
     # on IDAaaS if the user area isn't visible
     #ConfigService.setDataSearchDirs( \
@@ -222,7 +228,8 @@ def plotTransmissions(datalist,titlewarning='',fig=None,axes=None):
             axes.errorbar(ADS.retrieve(i), capsize=3.0, capthick=0.5, elinewidth=0.5, label=i, linewidth=0.5, wkspIndex=0)
     else:
         # create an empty plot with a title.
-        fig, axes = plt.figure()
+        if fig == None:
+            fig, axes = plt.subplots(num=title+'transmission', subplot_kw={'projection': 'mantid'})        
         axes.errorbar([0,1],[0,0],[0,0])
 
     if len(titlewarning) != 0:
