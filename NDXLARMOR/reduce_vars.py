@@ -3,9 +3,9 @@ standard_vars = {
     'SampleTRANS': None,
     'CanSANS': None,
     'CanTRANS': None,
-    'EmptyBeamTRANS': 56102,
-    'UserFile': 'USER_Riede_203B_Changer_r56102.txt',
-    'RBNumber': 2010523
+    'EmptyBeamTRANS': 56122,
+    'UserFile': 'USER_Perrier_203C_Changer_r56122.txt',
+    'RBNumber': 2010379
 }
 advanced_vars={
     'wl_ranges': [1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0],
