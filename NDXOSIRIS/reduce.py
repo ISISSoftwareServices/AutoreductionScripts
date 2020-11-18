@@ -10,6 +10,8 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
+# line added to test PR #928 and backing up of reduce.py script
+
 def validate(file, dir):
     """
     Function that validates if a file and/or directory exist. If not a
