@@ -1,13 +1,16 @@
+# For headless usage
+import matplotlib
+matplotlib.use('Agg')
+
 import numpy  # Required due to Mantid4.0 import issue 
 from mantid import config
 import os
 import sys
 
-
 AUTOREDUCTION_DIR = r"/isis/NDXMAPS/user/scripts/autoreduction"
 sys.path.append(AUTOREDUCTION_DIR)
 
-from mantid.simpleapi import Load, LoadNexusMonitors, ExtractSingleSpectrum, GetEi, Rebin, Max
+from mantid.simpleapi import Load, LoadNexusMonitors, ExtractSingleSpectrum, GetEi, Rebin, Max, Transpose
 from mantid.api import ScriptRepositoryFactory as srf
 repo = srf.Instance().create("ScriptRepositoryImpl")
 repo.install('/tmp/repo')
@@ -17,6 +20,8 @@ repo.download('direct_inelastic/MAPS/MAPSReduction_Sample.py')
 import MAPSReduction_Sample as maps_red
 
 import reduce_vars as web_var
+config['default.facility'] = 'ISIS'
+config['datasearch.searcharchive'] = 'on'
 
 
 def validate(input_file, output_dir):
@@ -67,7 +72,8 @@ def main(input_file, output_dir):
         standard_params['incident_energy'] = calculate_ei(input_file)
 
 
-    maps_red.iliad_maps_powder(runno=get_run_number(input_file),
+    run_number = get_run_number(input_file)
+    maps_red.iliad_maps_powder(runno=run_number,
                                ei=standard_params['incident_energy'],
                                wbvan=standard_params['wb_run'],
                                rebin_pars=standard_params['energy_bins'],
@@ -78,6 +84,8 @@ def main(input_file, output_dir):
                                check_background=advanced_params['check_background'],
                                **kwargs)
 
+    if standard_params['plot_type'] == 'slice':
+        slice_plot(run_number, output_dir)
             
 def calculate_ei(input_file):
     # Auto Find Eis by finding maximum data point in m2 (excluding end points)
@@ -139,7 +147,7 @@ def calculate_ei(input_file):
         except:
             continue
         if abs(t - TOF2) > 20. or abs(tzero) > 100.: continue
-        Ei.append(En)
+        Ei.append(Ei_guess)
         TOF.append(TOF2)
 
     #=========================================================
@@ -159,5 +167,45 @@ def get_run_number(path):
     return path.split(os.sep)[-1][3:][:-4]
 
 
+def slice_plot(run_number, output_dir):
+    """
+    Autoreduction generate plot from slice viewer
+    ---------------------------------------------
+
+    The slice viewer provides the best first look at the data. As such, we will generate and
+    save the slice images to CEPH and these will be picked up and displayed by the webapp
+    :param run_number: The current run number
+    """
+    for file in os.listdir(output_dir):
+        if '.nxspe' not in file or f'MAP{run_number}' not in file.upper():
+            continue
+        file_path = os.path.join(output_dir, file)
+        plot_name = file.split('.nxspe')[0]
+        fig = create_slice(file_path, plot_name)
+        fig.savefig(os.path.join(output_dir, f"{plot_name}.png"), dpi=None)        
+        
+
+def create_slice(file_path, plot_name):
+        import mslice.cli as mc
+        import matplotlib.pyplot as plt
+        import numpy as np
+        ws_name = plot_name.replace('.', '_')
+        ws = mc.Load(Filename=file_path, OutputWorkspace=ws_name)
+        fig = plt.figure()
+        # Using Mantid projection instead of MSlice to ensure it works headless
+        ax = fig.add_subplot(111, projection="mantid")
+        slice_ws = mc.Slice(ws)
+        mantid_slice = Transpose(slice_ws.raw_ws)
+        mesh = ax.pcolormesh(mantid_slice, cmap="viridis")
+        # Restrict color range to be 1/5 of the max counts in the range between 0.1 and 0.9 Ei
+        en = ws.get_coordinates()['Energy transfer']
+        en_id = np.where((en > ws.e_fixed/10) * (en < ws.e_fixed*0.9))
+        mesh.set_clim(0.0, np.max(ws.get_signal()[:,en_id]) / 3)
+        cb = plt.colorbar(mesh, ax=ax)
+        cb.set_label('Intensity (arb. units)', labelpad=20, rotation=270, picker=5)
+        ax.set_title(plot_name)
+        return fig
+
+
 if __name__ == "__main__":
-    main('', '')
+    main('/archive/NDXMAPS/Instrument/data/cycle_20_3/MAP40554.nxs', '/home/dl11170/autmp')

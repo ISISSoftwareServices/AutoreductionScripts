@@ -6,6 +6,7 @@ standard_vars = {
     'wb_run': 37520,
 	'sample_mass': 0,
     'sample_rmm': 0,
+    'plot_type': None,
 }
 advanced_vars={
     'wb_integr_range': [20, 100],
