@@ -3,7 +3,7 @@ standard_vars = {
     'energy_bins': [-1.5, 0.01, 0.9],
     'sum_runs': False,
     'monovan_run': None,
-    'white_beam_run': 'mar27292.raw',
+    'white_beam_run': 27593,
     'sample_mass': 0,
     'sample_rmm': 0,
     'plot_type': 'slice'
@@ -13,6 +13,7 @@ advanced_vars={
     'map_file': 'mari_res2013.map',
     'monovan_mapfile': 'mari_res2013.map',
     'hard_mask_file': 'mari_mask2020_2.xml',
+    'use_hard_mask_only': False,
     'save_format': 'nxspe',
     'data_file_ext':'.nxs', 
     'load_monitors_with_workspace': False,
