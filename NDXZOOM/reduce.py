@@ -16,7 +16,7 @@ import sys
 import sans.command_interface.ISISCommandInterface as ici
 import h5py as h5py
 #print(dir(ici))
-print(help(ici.PhiRanges))
+# print(help(ici.PhiRanges))
 
 AUTOREDUCTION_DIR = r"/isis/NDXZOOM/user/scripts/autoreduction"
 sys.path.append(AUTOREDUCTION_DIR)
