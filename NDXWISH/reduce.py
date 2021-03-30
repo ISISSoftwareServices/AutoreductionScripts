@@ -69,7 +69,7 @@ def WISH_userdir(cycle='cycle_10_1'):
     return wish_userdir
 
 def WISH_calibration(cycle="11_4"):
-	return "/home/autoreduce/InstrumentFiles/WISH/Calibration/Cycle_" + cycle + "/" 
+	return "/shared-config/InstrumentFiles/WISH/Calibration/Cycle_" + cycle + "/" 
 
 ### This is no longer needed unless run manually
 def WISH_startup(usern,cycle='14_3'):
@@ -83,7 +83,7 @@ def WISH_startup(usern,cycle='14_3'):
      userdatadir="/archive/ndxwish/Instrument/data/cycle_"+cycle+'/'
      WISH_setdatadir(userdatadir)
      print("Raw Data in : {}".format(userdatadir))
-     userdataprocessed="/home/"+usern+"/ProcessedData/"
+     userdataprocessed="/shared-config/ProcessedData/"
      WISH_setuserdir(directory=userdataprocessed)
      print("Processed Data in : {}".format(userdataprocessed))
      return
