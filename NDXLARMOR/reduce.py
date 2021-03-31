@@ -1,3 +1,6 @@
+import os
+import sys
+from sys import platform
 # For headless usage
 import matplotlib
 matplotlib.use('Agg')
@@ -10,13 +13,10 @@ from matplotlib.ticker import LogLocator
 import matplotlib.pyplot as plt
 import numpy as np
 import xml.etree.ElementTree as ET
-from sys import platform
-import os
-import sys
 import sans.command_interface.ISISCommandInterface as ici
 import h5py as h5py
 #print(dir(ici))
-print(help(ici.PhiRanges))
+#print(help(ici.PhiRanges))
 
 AUTOREDUCTION_DIR = r"/isis/NDXLARMOR/user/scripts/autoreduction"
 sys.path.append(AUTOREDUCTION_DIR)
@@ -62,7 +62,7 @@ def main(input_file, output_dir):
     dataset_names=list(f.keys())
     main_data_set=dataset_names[0]
     main_group=f[main_data_set]
-    title=main_group.get('title').value[0].decode('UTF-8')
+    title=main_group.get('title')[:][0].decode('UTF-8')
     f.close()
     runtype=title.split('_')[-1]
     if runtype == 'SANS':

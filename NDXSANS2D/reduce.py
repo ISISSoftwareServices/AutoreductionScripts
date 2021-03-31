@@ -62,7 +62,7 @@ def main(input_file, output_dir):
     dataset_names=list(f.keys())
     main_data_set=dataset_names[0]
     main_group=f[main_data_set]
-    title=main_group.get('title').value[0].decode('UTF-8')
+    title=main_group.get('title')[:][0].decode('UTF-8')
     f.close()
     runtype=title.split('_')[-1]
     if runtype == 'SANS':
