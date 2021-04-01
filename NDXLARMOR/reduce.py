@@ -65,30 +65,32 @@ def main(input_file, output_dir):
     title=main_group.get('title')[:][0].decode('UTF-8')
     f.close()
     runtype=title.split('_')[-1]
+    NoneType=type(None)
+    
     if runtype == 'SANS':
         SampleSANS=int(input_file[-12:-4])
         # ToDo: Put into function
-        if standard_params['SampleTRANS'] != 'None':
+        if standard_params['SampleTRANS'] != 'None' and type(standard_params['SampleTRANS']) != NoneType :
             SampleTRANS=int(standard_params['SampleTRANS'])
         else:
             SampleTRANS = None
 
-        if standard_params['CanSANS'] != 'None':
+        if standard_params['CanSANS'] != 'None' and type(standard_params['CanSANS']) != NoneType :
             CanSANS=int(standard_params['CanSANS'])
         else:
             CanSANS = None
 
-        if standard_params['CanTRANS'] != 'None':
+        if standard_params['CanTRANS'] != 'None' and type(standard_params['CanTRANS']) != NoneType :
             CanTRANS=int(standard_params['CanTRANS'])
         else:
             CanTRANS = None
 
-        if standard_params['EmptyBeamTRANS'] != 'None':
+        if standard_params['EmptyBeamTRANS'] != 'None' and type(standard_params['EmptyBeamTRANS']) != NoneType :
             EmptyBeamTRANS=int(standard_params['EmptyBeamTRANS'])
         else:
             EmptyBeamTRANS = None
 
-        if standard_params['RBNumber'] != 'None':
+        if standard_params['RBNumber'] != 'None' and type(standard_params['RBNumber']) != NoneType :
             RBNumber=int(standard_params['RBNumber'])
         else:
             RBNumber = None
@@ -493,6 +495,11 @@ def parseTitle(runtitle):
 
 def parseSANSTRANS(runtitle):
     us=list(find_all(runtitle,'_'))
+    # if there are no _s in the title then we can't do anything so 
+    # return as a trans so nothing happens
+    if len(us) == 0:
+        sanstrans=0
+        return sanstrans
     st=runtitle[us[-1]+1:]
     sanstrans=-1
     if runtitle[us[-1]+1:] == 'SANS':
