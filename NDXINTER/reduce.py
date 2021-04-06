@@ -1,41 +1,33 @@
-import os
-import shutil
 import sys
-sys.path.append("/isis/NDXMUSR/user/scripts/autoreduction")
-import reduce_vars as web_var
 
-def validate(input_file, output_dir):
-    """
-    Function to ensure that the files we want to use in reduction exist.
-    Please add any files/directories to the required_files/dirs lists.
-    """
-    print("Running validation")
-    required_files = [input_file]
-    required_dirs = [output_dir]
-    for file_path in required_files:
-        if not os.path.isfile(file_path):
-            raise RuntimeError("Unable to find file: {}".format(file_path))
-    for dir in required_dirs:
-        if not os.path.isdir(dir):
-            raise RuntimeError("Unable to find directory: {}".format(dir))
-    print("Validation successful")
-        
+AUTOREDUCTION_DIR = r"/autoreduce/data-archive/NDXINTER/user/scripts/autoreduction"
+sys.path.append(AUTOREDUCTION_DIR)
+
+# import mantid algorithms, numpy and matplotlib
+from mantid.simpleapi import *
+import matplotlib.pyplot as plt
+import numpy as np
+import reduce_vars as web_var
+import os
 
 def main(input_file, output_dir):
-    validate(input_file, output_dir)
+    standard_params = web_var.standard_vars
+    advanced_params = web_var.advanced_vars
     
-    # Example of printing some stuff which is captured in autoreduction
-    # output log file 
-    print(web_var)
-    print("input_file = " + str(input_file))
-    print("output_dir = " + str(output_dir))
+    config['defaultsave.directory'] = output_dir
     
-    # Copy raw data to output dir.
-    # Note this should only be done if raw files are small and for specific
-    # purpose such as testing 
-    shutil.copy(input_file, output_dir)
-
-    # And of course, here and below insert your reduction code!
+    OutputWorkspaceBinned, OutputWorkspace, OutputWorkspaceFirstTransmission, OutputWorkspaceSecondTransmission = ReflectometryISISLoadAndProcess(InputRunList=input_file,
+                                                        FirstTransmissionRunList=standard_params['first_transmission_run_list'],
+                                                        SecondTransmissionRunList=standard_params['second_transmission_run_list'],
+                                                        ThetaIn=standard_params['theta_in'],
+                                                        DetectorCorrectionType=standard_params['detector_correction_type'],
+                                                        AnalysisMode=standard_params['analysis_mode'],
+                                                        TransmissionProcessingInstructions=standard_params['transmission_processing_instructions'],
+                                                        ProcessingInstructions=standard_params['processing_instructions'])
+    
+    SaveNexus(OutputWorkspaceBinned, os.path.join(output_dir, OutputWorkspaceBinned.name()+".nxs"))
+    SaveNexus(OutputWorkspace, os.path.join(output_dir, OutputWorkspace.name()+".nxs"))
 
 if __name__ == "__main__":
-    main("test", "test")
+    main('', '')
+
