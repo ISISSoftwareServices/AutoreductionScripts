@@ -9,6 +9,13 @@ standard_vars = {
     'analysis_mode': "MultiDetectorAnalysis",
     'transmission_processing_instructions': "76-85",
     'processing_instructions': "80-84"
+    'MonitorIntegrationWavelengthMin' : 4.0,
+    'MonitorIntegrationWavelengthMax' : 10.0,
+    'WavelengthMin' : 1.5,
+    'WavelengthMax' : 17.0,
+    'StartOverlap' : 10.0,
+    'EndOverlap' : 12.0,
+    'IZeroMonitorIndex' : 2
 }
 advanced_vars = {
 }
