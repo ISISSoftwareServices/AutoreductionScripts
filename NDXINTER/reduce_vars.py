@@ -1,7 +1,4 @@
 standard_vars = {
-    'input_run_list' : "INTER00061667",
-    'theta_in': 0.7,
-
     'analysis_mode': "MultiDetectorAnalysis",
     'first_transmission_run_list' : "INTER00061705",
     'second_transmission_run_list' : "INTER00061669",

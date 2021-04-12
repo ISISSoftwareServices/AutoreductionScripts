@@ -19,15 +19,18 @@ import reduce_vars as web_var
 import os
 import json
 
+# Main funcion that gets called by the reduction
 def main(input_file, output_dir):
     standard_params = web_var.standard_vars
     advanced_params = web_var.advanced_vars
-
     config['defaultsave.directory'] = output_dir
 
-    angle = get_angle()
+    # Get the angle
+    angle = get_angle(input_file)
+    # Parse settings from JSON file
     analysis_mode,first_transmission_run_list,second_transmission_run_list,transmission_processing_instructions,processing_instructions,start_overlap,end_overlap,monitor_integration_wavelength_min,monitor_integration_wavelength_max,monitor_background_wavelength_min,monitor_background_wavelength_max,wavelength_min,wavelength_max,i_zero_monitor_index,detector_correction_type = parse_json_settings(angle)
 
+    # Run reduction
     alg=AlgorithmManager.create("ReflectometryISISLoadAndProcess")
     properties = {
     "InputRunList" : input_file,
@@ -48,33 +51,45 @@ def main(input_file, output_dir):
     "TransmissionProcessingInstructions" : transmission_processing_instructions,
     "ProcessingInstructions" : processing_instructions
     }
-
     alg.setProperties(properties)
     alg.execute()
 
+    # Save reduced data as Nexus files
     OutputWorkspace=alg.getPropertyValue("OutputWorkspace")
     OutputWorkspaceBinned=alg.getPropertyValue("OutputWorkspaceBinned")
-
     SaveNexus(OutputWorkspace, os.path.join(output_dir, OutputWorkspace+".nxs"))
     SaveNexus(OutputWorkspaceBinned, os.path.join(output_dir, OutputWorkspaceBinned+".nxs"))
 
-def get_angle():
-    ws=Load('INTER61668')
-    title = (ws.run().getProperty('run_title').value)
-    angle = title.split(" th=")[1].split()[0]
-    return angle
+
+def get_angle(input_file):
+    """
+    Get the average angle from logs of motor position
+    :param input_file: The input Nexus file
+    :return: Average angle from motor position readback
+    """
+    ws=Load(input_file)
+    # Filter the logs for all angles starting from time 0 and use the average of the returned angles
+    (angle_list, average_angle) = FilterLogByTime(ws, 'Theta', StartTime=0)
+    return average_angle
 
 def parse_json_settings(angle):
     """
-    Autoreduction get settings from JSON file
+    Get experiment settings and instrument settings from JSON file
+    :param angle: Angle passed in and used to select "per angle defaults"
+    :return: Returns all of the parameters needed to do the reduction
     """
     json_input = r"C:\Users\wyf59278\Documents\repos\reflectometry_reduction\settings.json"
 
     with open(json_input, "r") as read_file:
         data = json.load(read_file)
 
+    #========================================================================================
+    # Experiment Settings
+    #========================================================================================
+
     experimentView = data["experimentView"]
 
+    # Set a string based on what integer value is found
     if experimentView["analysisModeComboBox"] == 1:
         analysis_mode = "MultiDetectorAnalysis"
     elif experimentView["analysisModeComboBox"] == 0:
@@ -86,13 +101,18 @@ def parse_json_settings(angle):
     rows = perAngleDefaults["rows"]
 
     # This looks for the run angle and set other parameters accordingly
+    # Using a tolerance of +-0.5% of the motor readback angle
+    min = angle * 0.995
+    max = angle * 1.005
     angle_found = False
     for i in rows:
-        if i[0] == angle:
+        # If the value is within -0.5% to +0.5% it is counted as a match
+        if min <= float(i[0]) <= max:
             angle_found = True
             first_transmission_run_list = i[1]
             second_transmission_run_list = i[2]
             transmission_processing_instructions = i[3]
+            # Skipping over parameters that are present in the JSON file but not currently used in the reduction
             processing_instructions = i[8]
             break
 
@@ -104,15 +124,19 @@ def parse_json_settings(angle):
                 first_transmission_run_list = i[1]
                 second_transmission_run_list = i[2]
                 transmission_processing_instructions = i[3]
+                # Skipping over parameters that are present in the JSON file but not currently used in the reduction
                 processing_instructions = i[8]
                 break
 
     if not angle_found:
-        raise Exception # Excpetion for if neither a pre-defined angle or the default case are found
+        raise Exception # Excpetion for if neither a pre-defined angle nor the default case are found
 
     start_overlap = experimentView["startOverlapEdit"]
-
     end_overlap = experimentView["endOverlapEdit"]
+
+    #========================================================================================
+    # Instrument Settings
+    #========================================================================================
 
     instrumentView = data["instrumentView"]
 
@@ -124,6 +148,7 @@ def parse_json_settings(angle):
     wavelength_max = instrumentView["lamMaxEdit"]
     i_zero_monitor_index = instrumentView["I0MonitorIndex"]
 
+    # Set a string based on what integer value is found
     if instrumentView["detectorCorrectionTypeComboBox"] == 1:
         detector_correction_type = "RotateAroundSample"
     elif instrumentView["detectorCorrectionTypeComboBox"] == 0:
