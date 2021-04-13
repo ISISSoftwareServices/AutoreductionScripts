@@ -26,14 +26,17 @@ def main(input_file, output_dir):
     config['defaultsave.directory'] = output_dir
 
     # Get the angle
-    angle = get_angle(input_file)
+    angle, input_run = get_angle(input_file)
     # Parse settings from JSON file
-    analysis_mode,first_transmission_run_list,second_transmission_run_list,transmission_processing_instructions,processing_instructions,start_overlap,end_overlap,monitor_integration_wavelength_min,monitor_integration_wavelength_max,monitor_background_wavelength_min,monitor_background_wavelength_max,wavelength_min,wavelength_max,i_zero_monitor_index,detector_correction_type = parse_json_settings(angle)
+    analysis_mode, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, \
+    processing_instructions, start_overlap, end_overlap, monitor_integration_wavelength_min, \
+    monitor_integration_wavelength_max, monitor_background_wavelength_min, monitor_background_wavelength_max, wavelength_min, \
+    wavelength_max, i_zero_monitor_index, detector_correction_type = parse_json_settings(angle)
 
     # Run reduction
     alg=AlgorithmManager.create("ReflectometryISISLoadAndProcess")
     properties = {
-    "InputRunList" : input_file,
+    "InputRunList" : input_run,
     "FirstTransmissionRunList" : first_transmission_run_list,
     "SecondTransmissionRunList" : second_transmission_run_list,
     "ThetaIn" : angle,
@@ -65,12 +68,15 @@ def get_angle(input_file):
     """
     Get the average angle from logs of motor position
     :param input_file: The input Nexus file
-    :return: Average angle from motor position readback
+    :return: Average (mean) angle from motor position readback
     """
-    ws=Load(input_file)
+    run_str = input_file.split("INTER")[1].split(".")[0].strip("0")
+    instrument='INTER'
+    name=instrument+run_str
+    ws=Load(Filename=name, OutputWorkspace='TOF_'+run_str)
     # Filter the logs for all angles starting from time 0 and use the average of the returned angles
     (angle_list, average_angle) = FilterLogByTime(ws, 'Theta', StartTime=0)
-    return average_angle
+    return average_angle, name
 
 def parse_json_settings(angle):
     """
@@ -156,7 +162,10 @@ def parse_json_settings(angle):
     else:
         raise Exception # If the value isn't 1 or 0 then it isn't valid
 
-    return analysis_mode,first_transmission_run_list,second_transmission_run_list,transmission_processing_instructions,processing_instructions,start_overlap,end_overlap,monitor_integration_wavelength_min,monitor_integration_wavelength_max,monitor_background_wavelength_min,monitor_background_wavelength_max,wavelength_min,wavelength_max,i_zero_monitor_index,detector_correction_type
+    return analysis_mode, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, \
+    processing_instructions, start_overlap, end_overlap, monitor_integration_wavelength_min, \
+    monitor_integration_wavelength_max, monitor_background_wavelength_min, monitor_background_wavelength_max, wavelength_min, \
+    wavelength_max, i_zero_monitor_index,detector_correction_type
 
 if __name__ == "__main__":
     main('', '')
