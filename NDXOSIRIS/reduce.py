@@ -46,7 +46,8 @@ def main(input_file, output_dir):
 
     # Example of printing some stuff which is captured in autoreduction
     # output log file
-    print(web_var)
+    print(web_var.standard_vars)
+    print(web_var.advanced_vars)
     print("input_file = " + str(input_file))
     print("output_dir = " + str(output_dir))
 
