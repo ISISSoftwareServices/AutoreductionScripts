@@ -24,32 +24,29 @@ def main(input_file, output_dir):
     angle, input_run = get_angle(input_file)
     # Parse settings from JSON file
     json_input = standard_params['path_to_json_settings_file']
-    analysis_mode, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, \
-    processing_instructions, start_overlap, end_overlap, scale_rhs_workspace, monitor_integration_wavelength_min, \
-    monitor_integration_wavelength_max, monitor_background_wavelength_min, monitor_background_wavelength_max, wavelength_min, \
-    wavelength_max, i_zero_monitor_index, detector_correction_type = parse_json_settings(json_input, angle)
+    params = parse_json_settings(json_input, angle)
 
     # Run reduction
     alg=AlgorithmManager.create("ReflectometryISISLoadAndProcess")
     properties = {
     "InputRunList" : input_run,
-    "FirstTransmissionRunList" : first_transmission_run_list,
-    "SecondTransmissionRunList" : second_transmission_run_list,
+    "FirstTransmissionRunList" : params.first_transmission_run_list,
+    "SecondTransmissionRunList" : params.second_transmission_run_list,
     "ThetaIn" : angle,
-    "DetectorCorrectionType" : detector_correction_type,
-    "MonitorBackgroundWavelengthMin" : monitor_background_wavelength_min,
-    "MonitorBackgroundWavelengthMax" : monitor_background_wavelength_max,
-    "MonitorIntegrationWavelengthMin" : monitor_integration_wavelength_min,
-    "MonitorIntegrationWavelengthMax" : monitor_integration_wavelength_max,
-    "WavelengthMin" : wavelength_min,
-    "WavelengthMax" : wavelength_max,
-    "I0MonitorIndex" : i_zero_monitor_index,
-    "AnalysisMode" : analysis_mode,
-    "StartOverlap" : start_overlap,
-    "EndOverlap" : end_overlap,
-    "ScaleRHSWorkspace" : scale_rhs_workspace,
-    "TransmissionProcessingInstructions" : transmission_processing_instructions,
-    "ProcessingInstructions" : processing_instructions
+    "DetectorCorrectionType" : params.detector_correction_type,
+    "MonitorBackgroundWavelengthMin" : params.monitor_background_wavelength_min,
+    "MonitorBackgroundWavelengthMax" : params.monitor_background_wavelength_max,
+    "MonitorIntegrationWavelengthMin" : params.monitor_integration_wavelength_min,
+    "MonitorIntegrationWavelengthMax" : params.monitor_integration_wavelength_max,
+    "WavelengthMin" : params.wavelength_min,
+    "WavelengthMax" : params.wavelength_max,
+    "I0MonitorIndex" : params.i_zero_monitor_index,
+    "AnalysisMode" : params.analysis_mode,
+    "StartOverlap" : params.start_overlap,
+    "EndOverlap" : params.end_overlap,
+    "ScaleRHSWorkspace" : params.scale_rhs_workspace,
+    "TransmissionProcessingInstructions" : params.transmission_processing_instructions,
+    "ProcessingInstructions" : params.processing_instructions
     }
     alg.setProperties(properties)
     alg.execute()
@@ -62,7 +59,6 @@ def main(input_file, output_dir):
 
     # Save a copy of the .json settings file
     copy(json_input, output_dir)
-
 
 def get_angle(input_file):
     """
@@ -84,6 +80,7 @@ def parse_json_settings(json_input, angle):
     :param angle: Angle passed in and used to select "per angle defaults"
     :return: Returns all of the parameters needed to do the reduction
     """
+    params = INTERParams()
 
     with open(json_input, "r") as read_file:
         data = json.load(read_file)
@@ -96,9 +93,9 @@ def parse_json_settings(json_input, angle):
 
     # Set a string based on what integer value is found
     if experimentView["analysisModeComboBox"] == 1:
-        analysis_mode = "MultiDetectorAnalysis"
+        params.analysis_mode = "MultiDetectorAnalysis"
     elif experimentView["analysisModeComboBox"] == 0:
-        analysis_mode = "PointDetectorAnalysis"
+        params.analysis_mode = "PointDetectorAnalysis"
     else:
         raise Exception # If the value isn't 1 or 0 then it isn't valid
 
@@ -113,22 +110,22 @@ def parse_json_settings(json_input, angle):
     for row in rows:
         # If the value is within -0.5% to +0.5% it is counted as a match
         if min <= float(row[0]) <= max:
-            angle_found, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, processing_instructions = get_per_angle_defaults_params(row)
+            angle_found, params = get_per_angle_defaults_params(row, params)
             break
 
     # This is the default case
     if not angle_found:
         for row in rows:
             if row[0] == "":
-                angle_found, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, processing_instructions = get_per_angle_defaults_params(row)
+                angle_found, params = get_per_angle_defaults_params(row, params)
                 break
 
     if not angle_found:
         raise Exception # Excpetion for if neither a pre-defined angle nor the default case are found
 
-    start_overlap = experimentView["startOverlapEdit"]
-    end_overlap = experimentView["endOverlapEdit"]
-    scale_rhs_workspace = experimentView["transScaleRHSCheckBox"]
+    params.start_overlap = experimentView["startOverlapEdit"]
+    params.end_overlap = experimentView["endOverlapEdit"]
+    params.scale_rhs_workspace = experimentView["transScaleRHSCheckBox"]
 
     #========================================================================================
     # Instrument Settings
@@ -136,40 +133,55 @@ def parse_json_settings(json_input, angle):
 
     instrumentView = data["instrumentView"]
 
-    monitor_integration_wavelength_min = instrumentView["monIntMinEdit"]
-    monitor_integration_wavelength_max = instrumentView["monIntMaxEdit"]
-    monitor_background_wavelength_min = instrumentView["monBgMinEdit"]
-    monitor_background_wavelength_max = instrumentView["monBgMaxEdit"]
-    wavelength_min = instrumentView["lamMinEdit"]
-    wavelength_max = instrumentView["lamMaxEdit"]
-    i_zero_monitor_index = instrumentView["I0MonitorIndex"]
+    params.monitor_integration_wavelength_min = instrumentView["monIntMinEdit"]
+    params.monitor_integration_wavelength_max = instrumentView["monIntMaxEdit"]
+    params.monitor_background_wavelength_min = instrumentView["monBgMinEdit"]
+    params.monitor_background_wavelength_max = instrumentView["monBgMaxEdit"]
+    params.wavelength_min = instrumentView["lamMinEdit"]
+    params.wavelength_max = instrumentView["lamMaxEdit"]
+    params.i_zero_monitor_index = instrumentView["I0MonitorIndex"]
 
     # Set a string based on what integer value is found
     if instrumentView["detectorCorrectionTypeComboBox"] == 1:
-        detector_correction_type = "RotateAroundSample"
+        params.detector_correction_type = "RotateAroundSample"
     elif instrumentView["detectorCorrectionTypeComboBox"] == 0:
-        detector_correction_type = "VerticalShift"
+        params.detector_correction_type = "VerticalShift"
     else:
         raise Exception # If the value isn't 1 or 0 then it isn't valid
 
-    return analysis_mode, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, \
-    processing_instructions, start_overlap, end_overlap, scale_rhs_workspace, monitor_integration_wavelength_min, \
-    monitor_integration_wavelength_max, monitor_background_wavelength_min, monitor_background_wavelength_max, wavelength_min, \
-    wavelength_max, i_zero_monitor_index,detector_correction_type
+    return params
 
-def get_per_angle_defaults_params(row):
+def get_per_angle_defaults_params(row, params):
     """
     Get parameters that are dependant on the angle
     :param row: The row for the angle that has been selected (or the row for the default case if no angle was matched)
     :return: Returns all of the parameters that are dependant on the angle
     """
     angle_found = True
-    first_transmission_run_list = instrument+row[1]
-    second_transmission_run_list = instrument+row[2]
-    transmission_processing_instructions = row[3]
+    params.first_transmission_run_list = instrument+row[1]
+    params.second_transmission_run_list = instrument+row[2]
+    params.transmission_processing_instructions = row[3]
     # Skipping over parameters that are present in the JSON file but not currently used in the reduction
-    processing_instructions = row[8]
-    return angle_found, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, processing_instructions
+    params.processing_instructions = row[8]
+    return angle_found, params
+
+class INTERParams:
+    analysis_mode : str
+    first_transmission_run_list : str
+    second_transmission_run_list : str
+    transmission_processing_instructions : str
+    processing_instructions : str
+    start_overlap : str
+    end_overlap : str
+    scale_rhs_workspace : str
+    monitor_integration_wavelength_min : str
+    monitor_integration_wavelength_max : str
+    monitor_background_wavelength_min : str
+    monitor_background_wavelength_max : str
+    wavelength_min : str
+    wavelength_max : str
+    i_zero_monitor_index : str
+    detector_correction_type : str
 
 if __name__ == "__main__":
     main('','')
