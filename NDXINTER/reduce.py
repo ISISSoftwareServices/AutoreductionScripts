@@ -110,27 +110,17 @@ def parse_json_settings(json_input, angle):
     min = angle * 0.995
     max = angle * 1.005
     angle_found = False
-    for i in rows:
+    for row in rows:
         # If the value is within -0.5% to +0.5% it is counted as a match
-        if min <= float(i[0]) <= max:
-            angle_found = True
-            first_transmission_run_list = instrument+i[1]
-            second_transmission_run_list = instrument+i[2]
-            transmission_processing_instructions = i[3]
-            # Skipping over parameters that are present in the JSON file but not currently used in the reduction
-            processing_instructions = i[8]
+        if min <= float(row[0]) <= max:
+            angle_found, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, processing_instructions = get_per_angle_defaults_params(row)
             break
 
     # This is the default case
     if not angle_found:
-        for i in rows:
-            if i[0] == "":
-                angle_found = True
-                first_transmission_run_list = instrument+i[1]
-                second_transmission_run_list = instrument+i[2]
-                transmission_processing_instructions = i[3]
-                # Skipping over parameters that are present in the JSON file but not currently used in the reduction
-                processing_instructions = i[8]
+        for row in rows:
+            if row[0] == "":
+                angle_found, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, processing_instructions = get_per_angle_defaults_params(row)
                 break
 
     if not angle_found:
@@ -167,5 +157,20 @@ def parse_json_settings(json_input, angle):
     monitor_integration_wavelength_max, monitor_background_wavelength_min, monitor_background_wavelength_max, wavelength_min, \
     wavelength_max, i_zero_monitor_index,detector_correction_type
 
+def get_per_angle_defaults_params(row):
+    """
+    Get parameters that are dependant on the angle
+    :param row: The row for the angle that has been selected (or the row for the default case if no angle was matched)
+    :return: Returns all of the parameters that are dependant on the angle
+    """
+    angle_found = True
+    first_transmission_run_list = instrument+row[1]
+    second_transmission_run_list = instrument+row[2]
+    transmission_processing_instructions = row[3]
+    # Skipping over parameters that are present in the JSON file but not currently used in the reduction
+    processing_instructions = row[8]
+    return angle_found, first_transmission_run_list, second_transmission_run_list, transmission_processing_instructions, processing_instructions
+
 if __name__ == "__main__":
     main('','')
+
