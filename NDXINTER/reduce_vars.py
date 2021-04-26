@@ -1,5 +1,5 @@
 standard_vars = {
-    'path_to_json_settings_file' : '/autoreduce/scripts/settings.json'
+    'path_to_json_settings_file': '/autoreduce/scripts/settings.json'
     # 'analysis_mode': "MultiDetectorAnalysis",
     # 'first_transmission_run_list' : "INTER00061705",
     # 'second_transmission_run_list' : "INTER00061669",
