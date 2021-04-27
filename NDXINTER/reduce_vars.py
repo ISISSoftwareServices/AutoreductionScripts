@@ -1,5 +1,5 @@
 standard_vars = {
-    'path_to_json_settings_file': '/autoreduce/scripts/settings.json'
+    'path_to_json_settings_file': ''
     # 'analysis_mode': "MultiDetectorAnalysis",
     # 'first_transmission_run_list' : "INTER00061705",
     # 'second_transmission_run_list' : "INTER00061669",
@@ -17,4 +17,12 @@ advanced_vars = {
     # 'wavelength_max' : 17.0,
     # 'i_zero_monitor_index' : 2,
     # 'detector_correction_type': "VerticalShift"
+}
+
+variable_help = {
+    'standard_vars': {
+        'path_to_json_settings_file':
+        "Path to a settings.json saved on CEPH from the Mantid Reflectometry GUI, such as /instrument/INTER/RBNumber/RB1234567/settings.json",
+    },
+    'advanced_vars': {},
 }

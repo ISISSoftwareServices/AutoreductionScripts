@@ -26,25 +26,24 @@ def main(input_file, output_dir):
     advanced_params = web_var.advanced_vars
     config['defaultsave.directory'] = output_dir
 
-    input_workspace, workspace_name = load_workspace(input_file)
-    save_detector_image(input_workspace, workspace_name, output_dir)
-    save_specular_pixel_check(input_workspace, workspace_name, output_dir)
+    input_workspace, datafile_name = load_workspace(input_file)
+    save_detector_image(input_workspace, datafile_name, output_dir)
+    save_specular_pixel_check(input_workspace, datafile_name, output_dir)
 
     run_title = input_workspace.getTitle()
     run_rb = str(input_workspace.getRun().getLogData("rb_proposal").value)
-
+    print("Run title:", run_title, "RB:", run_rb)
+    settings_file = find_settings_json(
+        input_file, standard_params['path_to_json_settings_file'])
     print(find_group_runs(run_title, run_rb))
-    run_reduction(input_workspace, workspace_name)
+    run_reduction(input_workspace, datafile_name, settings_file, output_dir)
 
 
-def run_reduction(input_workspace: EventWorkspace,
-                  workspace_name: str):  # Run reduction
+def run_reduction(input_workspace: EventWorkspace, workspace_name: str,
+                  settings_file: str, output_dir: str):  # Run reduction
     # Get the angle
     angle = get_angle(input_workspace)
-    # Parse settings from JSON file
-    json_input = standard_params['path_to_json_settings_file']
-    # json_input = R"C:\users\qbr77747\desktop\settings.json"
-    params = find_angle_parameters_from_settings_json(json_input, angle)
+    params = find_angle_parameters_from_settings_json(settings_file, angle)
 
     alg = AlgorithmManager.create("ReflectometryISISLoadAndProcess")
     properties = {
@@ -85,7 +84,7 @@ def run_reduction(input_workspace: EventWorkspace,
               os.path.join(output_dir, OutputWorkspaceBinned + ".nxs"))
 
     # Save a copy of the .json settings file
-    copy(json_input, output_dir)
+    copy(settings_file, output_dir)
 
 
 def load_workspace(input_file) -> EventWorkspace:
@@ -98,7 +97,7 @@ def load_workspace(input_file) -> EventWorkspace:
     run_str = filename.split("INTER")[1].split(".")[0].strip("0")
     name = instrument + run_str
     ws = LoadISISNexus(Filename=name, OutputWorkspace='TOF_' + run_str)
-    return ws, name
+    return ws, filename
 
 
 def get_angle(workspace: EventWorkspace):
@@ -144,7 +143,7 @@ def find_angle_parameters_from_settings_json(json_input, angle):
     angle_found = False
     for row in rows:
         # If the value is within -0.5% to +0.5% it is counted as a match
-        if min <= float(row[0]) <= max:
+        if row[0] and min <= float(row[0]) <= max:
             angle_found, params = get_per_angle_defaults_params(row, params)
             break
 
@@ -231,9 +230,9 @@ def find_group_runs(current_run_title, run_rb):
     Queries the JournalViewer to find runs in the RB number that have the same title
     """
     print(current_run_title)
-    if "th" not in current_run_title:
+    if "th" in current_run_title:
         current_title, _ = current_run_title.split(" th")
-        journal_ws = ISISJournalGetExperimentRuns("20_3", run_rb, "INTER")
+        journal_ws = ISISJournalGetExperimentRuns("21_1", run_rb, "INTER")
 
         group_runs = []
         for group_run_filename, group_run_title in zip(journal_ws.column(0),
@@ -241,6 +240,14 @@ def find_group_runs(current_run_title, run_rb):
             if current_title in group_run_title:
                 group_runs.append(group_run_filename)
         return group_runs
+
+
+def find_settings_json(input_file: str, web_settings_json: str):
+    if web_settings_json:
+        return web_settings_json
+
+    rb_dir, autoreduce_dir = input_file.split("autoreduced")
+    return rb_dir
 
 
 class INTERParams:
