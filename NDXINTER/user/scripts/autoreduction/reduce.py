@@ -1,9 +1,15 @@
 import sys
 
-#AUTOREDUCTION_DIR = "/isis/NDXINTER/user/scripts/autoreduction"
-#sys.path.append(AUTOREDUCTION_DIR)
+# For headless usage
+import matplotlib
+matplotlib.use('Agg')
 
-from mantid.simpleapi import SaveNexus, Load, FilterLogByTime, AlgorithmManager, config
+AUTOREDUCTION_DIR = "/isis/NDXINTER/user/scripts/autoreduction"
+
+sys.path.append(AUTOREDUCTION_DIR)
+
+from mantid.simpleapi import SaveNexus, LoadISISNexus, FilterLogByTime, AlgorithmManager, Integration, Transpose, config, ISISJournalGetExperimentRuns
+from mantid.dataobjects import EventWorkspace
 import matplotlib.pyplot as plt
 import numpy as np
 import reduce_vars as web_var
@@ -20,17 +26,29 @@ def main(input_file, output_dir):
     advanced_params = web_var.advanced_vars
     config['defaultsave.directory'] = output_dir
 
-    # Get the angle
-    angle, input_run = get_angle(input_file)
-    # Parse settings from JSON file
-    #json_input = standard_params['path_to_json_settings_file']
-    json_input = r"C:\Users\qbr77747\Desktop\settings.json"
-    params = parse_json_settings(json_input, angle)
+    input_workspace, workspace_name = load_workspace(input_file)
+    save_detector_image(input_workspace, workspace_name, output_dir)
+    save_specular_pixel_check(input_workspace, workspace_name, output_dir)
 
-    # Run reduction
+    run_title = input_workspace.getTitle()
+    run_rb = str(input_workspace.getRun().getLogData("rb_proposal").value)
+    print("Run title:",run_title,"RB:", run_rb)
+
+    print(find_group_runs(run_title, run_rb))
+    run_reduction(input_workspace, workspace_name,
+                  standard_params['path_to_json_settings_file'])
+
+
+def run_reduction(input_workspace: EventWorkspace, workspace_name: str,
+                  json_input):  # Run reduction
+    # Get the angle
+    angle = get_angle(input_workspace)
+    # json_input = R"C:\users\qbr77747\desktop\settings.json"
+    params = find_angle_parameters_from_settings_json(json_input, angle)
+
     alg = AlgorithmManager.create("ReflectometryISISLoadAndProcess")
     properties = {
-        "InputRunList": input_run,
+        "InputRunList": workspace_name,
         "FirstTransmissionRunList": params.first_transmission_run_list,
         "SecondTransmissionRunList": params.second_transmission_run_list,
         "ThetaIn": angle,
@@ -60,6 +78,7 @@ def main(input_file, output_dir):
     # Save reduced data as Nexus files
     OutputWorkspace = alg.getPropertyValue("OutputWorkspace")
     OutputWorkspaceBinned = alg.getPropertyValue("OutputWorkspaceBinned")
+
     SaveNexus(OutputWorkspace,
               os.path.join(output_dir, OutputWorkspace + ".nxs"))
     SaveNexus(OutputWorkspaceBinned,
@@ -69,7 +88,7 @@ def main(input_file, output_dir):
     copy(json_input, output_dir)
 
 
-def get_angle(input_file):
+def load_workspace(input_file) -> EventWorkspace:
     """
     Get the average angle from logs of motor position
     :param input_file: The input Nexus file
@@ -78,13 +97,19 @@ def get_angle(input_file):
     filename = os.path.basename(input_file)
     run_str = filename.split("INTER")[1].split(".")[0].strip("0")
     name = instrument + run_str
-    ws = Load(Filename=name, OutputWorkspace='TOF_' + run_str)
+    ws = LoadISISNexus(Filename=name, OutputWorkspace='TOF_' + run_str)
+    return ws, name
+
+
+def get_angle(workspace: EventWorkspace):
     # Filter the logs for all angles starting from time 0 and use the average of the returned angles
-    (angle_list, average_angle) = FilterLogByTime(ws, 'Theta', StartTime=0)
-    return average_angle, name
+    (angle_list, average_angle) = FilterLogByTime(workspace,
+                                                  'Theta',
+                                                  StartTime=0)
+    return average_angle
 
 
-def parse_json_settings(json_input, angle):
+def find_angle_parameters_from_settings_json(json_input, angle):
     """
     Get experiment settings and instrument settings from JSON file
     :param angle: Angle passed in and used to select "per angle defaults"
@@ -178,6 +203,46 @@ def get_per_angle_defaults_params(row, params):
     return angle_found, params
 
 
+def save_detector_image(input_workspace, name: str, output_dir):
+    fig, ax = plt.subplots(subplot_kw={'projection': 'mantid'})
+    ax.imshow(input_workspace,
+              aspect='auto',
+              cmap='viridis',
+              distribution=True,
+              origin='lower')
+    fig.savefig(os.path.join(output_dir, f"{name}_detector_image.png"))
+
+
+def save_specular_pixel_check(input_workspace, name, output_dir):
+    integrated = Integration(input_workspace,
+                             RangeLower=9000,
+                             RangeUpper=88000,
+                             StartWorkspaceIndex=70,
+                             EndWorkspaceIndex=95)
+
+    integrated_transposed = Transpose(integrated)
+    fig, ax = plt.subplots(subplot_kw={'projection': 'mantid'})
+    ax.plot(integrated_transposed)
+    fig.savefig(os.path.join(output_dir, f"{name}_specular.png"))
+
+
+def find_group_runs(current_run_title, run_rb):
+    """
+    Queries the JournalViewer to find runs in the RB number that have the same title
+    """
+    print(current_run_title)
+    if "th" in current_run_title:
+        current_title, _ = current_run_title.split(" th")
+        journal_ws = ISISJournalGetExperimentRuns("20_3", run_rb, "INTER")
+
+        group_runs = []
+        for group_run_filename, group_run_title in zip(journal_ws.column(0),
+                                                       journal_ws.column(2)):
+            if current_title in group_run_title:
+                group_runs.append(group_run_filename)
+        return group_runs
+
+
 class INTERParams:
     analysis_mode: str
     first_transmission_run_list: str
@@ -197,4 +262,5 @@ class INTERParams:
     detector_correction_type: str
 
 
-main('INTER61667.nxs', '')
+# if __name__=="__main__":
+# main('INTER61667.nxs', '')
