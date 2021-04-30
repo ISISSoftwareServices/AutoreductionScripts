@@ -25,6 +25,7 @@ def main(input_file, output_dir):
     standard_params = web_var.standard_vars
     advanced_params = web_var.advanced_vars
     config['defaultsave.directory'] = output_dir
+    print("Input file", input_file, "output dir", output_dir)
 
     input_workspace, datafile_name = load_workspace(input_file)
     save_detector_image(input_workspace, datafile_name, output_dir)
@@ -34,7 +35,8 @@ def main(input_file, output_dir):
     run_rb = str(input_workspace.getRun().getLogData("rb_proposal").value)
     print("Run title:", run_title, "RB:", run_rb)
     settings_file = find_settings_json(
-        input_file, standard_params['path_to_json_settings_file'])
+        standard_params['path_to_json_settings_file'],
+        f"/instrument/INTER/RBNumber/RB{run_rb}")
     print(find_group_runs(run_title, run_rb))
     run_reduction(input_workspace, datafile_name, settings_file, output_dir)
 
@@ -242,12 +244,23 @@ def find_group_runs(current_run_title, run_rb):
         return group_runs
 
 
-def find_settings_json(input_file: str, web_settings_json: str):
+def find_settings_json(web_settings_json: str, output_rb_dir: str):
+    """
+    Tries to find a settings.json that should be used for this reduction.
+
+    If one is not found it defaults to using the one in the autoreduction directory on the Archive
+    """
+    # check if a specific file is provided from the web app
     if web_settings_json:
         return web_settings_json
 
-    rb_dir, autoreduce_dir = input_file.split("autoreduced")
-    return rb_dir
+    # if not - check if a settings.json exists in the experiment's CEPH folder
+    settings_in_rb_dir = os.path.join(output_rb_dir, "settings.json")
+    if os.path.exists(settings_in_rb_dir):
+        return settings_in_rb_dir
+
+    # finally default to the settings.json in the autoreduction directory on the Archive
+    return f"{AUTOREDUCTION_DIR}/settings.json"
 
 
 class INTERParams:

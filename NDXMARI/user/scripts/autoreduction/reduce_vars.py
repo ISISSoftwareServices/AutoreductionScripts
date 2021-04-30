@@ -3,7 +3,7 @@ standard_vars = {
     'energy_bins': [-1.5, 0.01, 0.9],
     'sum_runs': False,
     'monovan_run': None,
-    'white_beam_run': 27593,
+    'white_beam_run': 28041,
     'sample_mass': 0,
     'sample_rmm': 0,
     'plot_type': 'slice'
