@@ -1,4 +1,5 @@
 import sys
+from typing import Tuple
 
 # For headless usage
 import matplotlib
@@ -8,8 +9,11 @@ AUTOREDUCTION_DIR = "/isis/NDXINTER/user/scripts/autoreduction"
 
 sys.path.append(AUTOREDUCTION_DIR)
 
-from mantid.simpleapi import SaveNexus, LoadISISNexus, FilterLogByTime, AlgorithmManager, Integration, Transpose, config, ISISJournalGetExperimentRuns
+from mantid.simpleapi import SaveNexus, Load, LoadISISNexus, FilterLogByTime, AlgorithmManager, Integration, Transpose, config, ISISJournalGetExperimentRuns, Fit, ApplyFloodWorkspace
 from mantid.dataobjects import EventWorkspace
+from matplotlib.colors import SymLogNorm
+# from mantid.api import AnalysisDataService as ADS
+
 import matplotlib.pyplot as plt
 import numpy as np
 import reduce_vars as web_var
@@ -28,8 +32,16 @@ def main(input_file, output_dir):
     print("Input file", input_file, "output dir", output_dir)
 
     input_workspace, datafile_name = load_workspace(input_file)
-    save_detector_image(input_workspace, datafile_name, output_dir)
-    save_specular_pixel_check(input_workspace, datafile_name, output_dir)
+    flood_workspace = Load(advanced_params["flood_workspace"])
+    fig, (det_image_ax,
+          spec_pixel_ax) = plt.subplots(figsize=(13, 4.8),
+                                        ncols=2,
+                                        subplot_kw={'projection': 'mantid'})
+    fig.suptitle(input_workspace.getTitle())
+
+    plot_detector_image(input_workspace, fig, det_image_ax)
+    plot_specular_pixel_check(input_workspace, flood_workspace, spec_pixel_ax)
+    fig.savefig(os.path.join(output_dir, f"{datafile_name}.png"))
 
     run_title = input_workspace.getTitle()
     run_rb = str(input_workspace.getRun().getLogData("rb_proposal").value)
@@ -89,7 +101,7 @@ def run_reduction(input_workspace: EventWorkspace, workspace_name: str,
     copy(settings_file, output_dir)
 
 
-def load_workspace(input_file) -> EventWorkspace:
+def load_workspace(input_file) -> Tuple[EventWorkspace, str]:
     """
     Get the average angle from logs of motor position
     :param input_file: The input Nexus file
@@ -204,27 +216,51 @@ def get_per_angle_defaults_params(row, params):
     return angle_found, params
 
 
-def save_detector_image(input_workspace, name: str, output_dir):
-    fig, ax = plt.subplots(subplot_kw={'projection': 'mantid'})
-    ax.imshow(input_workspace,
-              aspect='auto',
-              cmap='viridis',
-              distribution=True,
-              origin='lower')
-    fig.savefig(os.path.join(output_dir, f"{name}_detector_image.png"))
+def plot_detector_image(input_workspace: EventWorkspace, fig, ax):
+    plot = ax.imshow(input_workspace,
+                     aspect='auto',
+                     cmap='viridis',
+                     distribution=True,
+                     origin='lower',
+                     norm=SymLogNorm(1e-6))
+    fig.colorbar(plot, ax=ax)
+    ax.set_title("Detector image")
 
 
-def save_specular_pixel_check(input_workspace, name, output_dir):
-    integrated = Integration(input_workspace,
+def plot_specular_pixel_check(input_workspace, flood_workspace, ax):
+    flooded_ws = ApplyFloodWorkspace(input_workspace, flood_workspace)
+
+    integrated = Integration(flooded_ws,
                              RangeLower=9000,
                              RangeUpper=88000,
                              StartWorkspaceIndex=70,
                              EndWorkspaceIndex=95)
 
     integrated_transposed = Transpose(integrated)
-    fig, ax = plt.subplots(subplot_kw={'projection': 'mantid'})
+
+    Function = "name=Gaussian,Height=200000,PeakCentre=82.1227,Sigma=0.583909"
+    output_ws_name = "int_trans_fit"
+
+    outputs = Fit(StartX=70,
+                  EndX=95,
+                  Output=output_ws_name,
+                  Function=Function,
+                  InputWorkspace=integrated_transposed,
+                  Normalise=True)
+
     ax.plot(integrated_transposed)
-    fig.savefig(os.path.join(output_dir, f"{name}_specular.png"))
+    ax.plot(outputs.OutputWorkspace, wkspIndex=1)
+    ax.plot(outputs.OutputWorkspace, wkspIndex=2)
+    # min_pos = outputs.OutputWorkspace.readY(2).argmin()
+    # annot_y = outputs.OutputWorkspace.readY(1)[min_pos]
+    # annot_x = outputs.OutputWorkspace.readX(1)[min_pos]
+    # ax.annotate(f"X:{annot_x}, Y:{annot_y}",
+    #             xy=(annot_x, annot_y),
+    #             xytext=(annot_x * 0.97, annot_y * 1.01))
+
+    ax.grid()
+    ax.legend(loc="upper right", fontsize="small")
+    ax.set_title("Specular pixel")
 
 
 def find_group_runs(current_run_title, run_rb):
