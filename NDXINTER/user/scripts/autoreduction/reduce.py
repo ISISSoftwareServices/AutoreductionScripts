@@ -1,5 +1,5 @@
 import sys
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 # For headless usage
 import matplotlib
@@ -20,6 +20,7 @@ import reduce_vars as web_var
 import os
 import json
 from shutil import copy
+from scipy import optimize
 
 instrument = 'INTER'
 
@@ -49,8 +50,23 @@ def main(input_file, output_dir):
     settings_file = find_settings_json(
         standard_params['path_to_json_settings_file'],
         f"/instrument/INTER/RBNumber/RB{run_rb}")
-    print(find_group_runs(run_title, run_rb))
-    run_reduction(input_workspace, datafile_name, settings_file, output_dir)
+
+    # only reduce if not a transmission run
+    if settings_file and "trans" not in run_title.lower():
+        run_reduction(input_workspace, datafile_name, settings_file,
+                      output_dir)
+    else:
+        print(
+            "Skipping reduction due to",
+            "missing settings file" if settings_file is None else
+            f"this having 'trans' in the title: {run_title}")
+
+    group_run_numbers = find_group_runs(run_title, run_rb)
+    print("Found group_run_numbers:", group_run_numbers)
+
+    # if group_run_numbers:
+    # group_run_ax = fig.add_subplot(223)
+    # plot_group_runs(group_run_numbers, fig, group_run_ax)
 
 
 def run_reduction(input_workspace: EventWorkspace, workspace_name: str,
@@ -227,7 +243,8 @@ def plot_detector_image(input_workspace: EventWorkspace, fig, ax):
     ax.set_title("Detector image")
 
 
-def plot_specular_pixel_check(input_workspace, flood_workspace, ax):
+def plot_specular_pixel_check(input_workspace: EventWorkspace,
+                              flood_workspace: EventWorkspace, ax):
     flooded_ws = ApplyFloodWorkspace(input_workspace, flood_workspace)
 
     integrated = Integration(flooded_ws,
@@ -238,28 +255,33 @@ def plot_specular_pixel_check(input_workspace, flood_workspace, ax):
 
     integrated_transposed = Transpose(integrated)
 
-    Function = "name=Gaussian,Height=200000,PeakCentre=82.1227,Sigma=0.583909"
-    output_ws_name = "int_trans_fit"
+    def _1gaussian(x, ampl, cent, sigma):
+        return ampl * (1 / sigma *
+                       (np.sqrt(2 * np.pi))) * (np.exp(-((x - cent)**2) /
+                                                       (2 * sigma)**2))
 
-    outputs = Fit(StartX=70,
-                  EndX=95,
-                  Output=output_ws_name,
-                  Function=Function,
-                  InputWorkspace=integrated_transposed,
-                  Normalise=True)
+    xval = integrated_transposed.readX(0)
+    yval = integrated_transposed.readY(0)
+    popt_gauss, pcov_gauss = optimize.curve_fit(_1gaussian,
+                                                xval,
+                                                yval,
+                                                p0=[56000, 82, 0.8])
+    perr_gauss = np.sqrt(np.diag(pcov_gauss))
 
-    ax.plot(integrated_transposed)
-    ax.plot(outputs.OutputWorkspace, wkspIndex=1)
-    ax.plot(outputs.OutputWorkspace, wkspIndex=2)
-    # min_pos = outputs.OutputWorkspace.readY(2).argmin()
-    # annot_y = outputs.OutputWorkspace.readY(1)[min_pos]
-    # annot_x = outputs.OutputWorkspace.readX(1)[min_pos]
-    # ax.annotate(f"X:{annot_x}, Y:{annot_y}",
-    #             xy=(annot_x, annot_y),
-    #             xytext=(annot_x * 0.97, annot_y * 1.01))
+    fit_yvals = _1gaussian(xval, *popt_gauss)
 
-    ax.grid()
-    ax.legend(loc="upper right", fontsize="small")
+    ax.plot(xval, yval, "rx")
+    ax.plot(xval, fit_yvals, 'k--')
+    ax.set_xlabel("Spectrum")
+    ax.set_ylabel("Counts")
+    max_pos = fit_yvals.argmax()
+    annot_y = fit_yvals[max_pos]
+    annot_x = xval[max_pos]
+    ax.annotate(f"X:{annot_x}, Y:{annot_y}",
+                xy=(annot_x, annot_y),
+                xytext=(annot_x * 1.02, annot_y))
+    ax.minorticks_on()
+    ax.grid(True, which="both")
     ax.set_title("Specular pixel")
 
 
@@ -267,20 +289,28 @@ def find_group_runs(current_run_title, run_rb):
     """
     Queries the JournalViewer to find runs in the RB number that have the same title
     """
-    print(current_run_title)
-    if "th" in current_run_title:
-        current_title, _ = current_run_title.split(" th")
-        journal_ws = ISISJournalGetExperimentRuns("20_3", run_rb, "INTER")
+    current_title, _ = current_run_title.split(" th")
+    journal_ws = ISISJournalGetExperimentRuns("20_3", run_rb, "INTER")
 
-        group_runs = []
-        for group_run_filename, group_run_title in zip(journal_ws.column(0),
-                                                       journal_ws.column(2)):
-            if current_title in group_run_title:
-                group_runs.append(group_run_filename)
-        return group_runs
+    group_runs = []
+    for i in range(journal_ws.rowCount()):
+        _, group_run_number, group_run_title = journal_ws.row(i).values()
+
+        if current_title in group_run_title:
+            group_runs.append(group_run_number)
+    return group_runs
 
 
-def find_settings_json(web_settings_json: str, output_rb_dir: str):
+def plot_group_runs(group_run_numbers: List[int], fig, ax):
+    for run in group_run_numbers:
+        ws = Load()
+        ax.loglog(ws)
+
+    ax.title()
+
+
+def find_settings_json(web_settings_json: str,
+                       output_rb_dir: str) -> Optional[str]:
     """
     Tries to find a settings.json that should be used for this reduction.
 
@@ -295,8 +325,7 @@ def find_settings_json(web_settings_json: str, output_rb_dir: str):
     if os.path.exists(settings_in_rb_dir):
         return settings_in_rb_dir
 
-    # finally default to the settings.json in the autoreduction directory on the Archive
-    return f"{AUTOREDUCTION_DIR}/settings.json"
+    return None
 
 
 class INTERParams:

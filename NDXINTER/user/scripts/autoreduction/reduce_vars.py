@@ -10,7 +10,7 @@ standard_vars = {
 }
 advanced_vars = {
     "flood_workspace":
-    "/isis/NDXINTER/User/scripts/autoreduction/58834_flood.nxs"
+    "/isis/NDXINTER/User/INTER/FloodFiles/Flood_cycle_21_1.nxs"
     # "monitor_integration_wavelength_min" : 4.0,
     # "monitor_integration_wavelength_max" : 10.0,
     # "monitor_background_wavelength_min": 17.0,
