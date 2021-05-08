@@ -12,7 +12,7 @@ advanced_vars={
     'normalise_method': 'current',
     'map_file': 'mari_res2013.map',
     'monovan_mapfile': 'mari_res2013.map',
-    'hard_mask_file': 'mari_mask2020_2.xml',
+    'hard_mask_file': 'mari_mask2021_1.xml',
     'use_hard_mask_only': False,
     'save_format': 'nxspe',
     'data_file_ext':'.nxs', 

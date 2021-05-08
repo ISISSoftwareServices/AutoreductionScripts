@@ -272,6 +272,7 @@ def plot_specular_pixel_check(input_workspace: EventWorkspace,
 
     ax.plot(xval, yval, "rx")
     ax.plot(xval, fit_yvals, 'k--')
+    ax.axvline(x=82.0,color='b',linestyle='--')
     ax.set_xlabel("Spectrum")
     ax.set_ylabel("Counts")
     max_pos = fit_yvals.argmax()
