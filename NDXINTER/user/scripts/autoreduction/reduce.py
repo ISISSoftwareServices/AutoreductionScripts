@@ -1,5 +1,7 @@
 import sys
 from typing import List, Optional, Tuple
+import plotly.graph_objs as go
+import plotly.express as px
 
 # For headless usage
 import matplotlib
@@ -41,7 +43,11 @@ def main(input_file, output_dir):
     fig.suptitle(input_workspace.getTitle())
 
     plot_detector_image(input_workspace, fig, det_image_ax)
-    plot_specular_pixel_check(input_workspace, flood_workspace, spec_pixel_ax)
+    plotly_fig = plot_specular_pixel_check(input_workspace, flood_workspace,
+                                           spec_pixel_ax)
+    with open(os.path.join(output_dir, f"{datafile_name}_peak.json"),
+              'w') as figfile:
+        figfile.write(plotly_fig)
     fig.savefig(os.path.join(output_dir, f"{datafile_name}.png"))
 
     run_title = input_workspace.getTitle()
@@ -272,7 +278,7 @@ def plot_specular_pixel_check(input_workspace: EventWorkspace,
 
     ax.plot(xval, yval, "rx")
     ax.plot(xval, fit_yvals, 'k--')
-    ax.axvline(x=82.0,color='b',linestyle='--')
+    ax.axvline(x=82.0, color='b', linestyle='--')
     ax.set_xlabel("Spectrum")
     ax.set_ylabel("Counts")
     max_pos = fit_yvals.argmax()
@@ -284,6 +290,19 @@ def plot_specular_pixel_check(input_workspace: EventWorkspace,
     ax.minorticks_on()
     ax.grid(True, which="both")
     ax.set_title("Specular pixel")
+
+    # make interactive plotly figure
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(x=xval,
+                   y=yval,
+                   name="Data",
+                   mode="markers",
+                   marker_symbol=4))
+    fig.add_trace(go.Line(x=xval, y=fit_yvals, name="Fit"))
+    fig.add_vline(x=82, line_dash="dash", line_color="blue")
+    fig.update_layout(xaxis_title="Spectrum", yaxis_title="Counts")
+    return fig.to_json()
 
 
 def find_group_runs(current_run_title, run_rb):
