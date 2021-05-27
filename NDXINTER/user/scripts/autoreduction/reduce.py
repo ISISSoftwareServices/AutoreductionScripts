@@ -52,6 +52,7 @@ def main(input_file, output_dir):
 
     run_title = input_workspace.getTitle()
     run_rb = str(input_workspace.getRun().getLogData("rb_proposal").value)
+    run_number = str(input_workspace.getRun().getLogData("run_number").value)
     print("Run title:", run_title, "RB:", run_rb)
     settings_file = find_settings_json(
         standard_params['path_to_json_settings_file'],
@@ -67,12 +68,19 @@ def main(input_file, output_dir):
             "missing settings file" if settings_file is None else
             f"this having 'trans' in the title: {run_title}")
 
-    group_run_numbers = find_group_runs(run_title, run_rb)
+    group_run_numbers, group_name = find_group_runs(run_title, run_rb,
+                                                    input_file)
     print("Found group_run_numbers:", group_run_numbers)
 
-    # if group_run_numbers:
-    # group_run_ax = fig.add_subplot(223)
-    # plot_group_runs(group_run_numbers, fig, group_run_ax)
+    if group_run_numbers:
+        try:
+            group_plot_fig = plot_group_runs(group_run_numbers, group_name,
+                                             run_rb, run_number, output_dir)
+            with open(os.path.join(output_dir, f"{datafile_name}_group.json"),
+                      'w') as figfile:
+                figfile.write(group_plot_fig)
+        except Exception as err:
+            print("Encountered error while trying to plot group:", err)
 
 
 def run_reduction(input_workspace: EventWorkspace, workspace_name: str,
@@ -271,14 +279,14 @@ def plot_specular_pixel_check(input_workspace: EventWorkspace,
     popt_gauss, pcov_gauss = optimize.curve_fit(_1gaussian,
                                                 xval,
                                                 yval,
-                                                p0=[56000, 82, 0.8])
+                                                p0=[56000, 86, 0.8])
     perr_gauss = np.sqrt(np.diag(pcov_gauss))
 
     fit_yvals = _1gaussian(xval, *popt_gauss)
 
     ax.plot(xval, yval, "rx")
     ax.plot(xval, fit_yvals, 'k--')
-    ax.axvline(x=82.0, color='b', linestyle='--')
+    ax.axvline(x=86.0, color='b', linestyle='--')
     ax.set_xlabel("Spectrum")
     ax.set_ylabel("Counts")
     max_pos = fit_yvals.argmax()
@@ -299,34 +307,82 @@ def plot_specular_pixel_check(input_workspace: EventWorkspace,
                    name="Data",
                    mode="markers",
                    marker_symbol=4))
-    fig.add_trace(go.Line(x=xval, y=fit_yvals, name="Fit"))
-    fig.add_vline(x=82, line_dash="dash", line_color="blue")
+    fig.add_trace(go.Scatter(x=xval, y=fit_yvals, mode="lines", name="Fit"))
+    fig.add_vline(x=86, line_dash="dash", line_color="blue")
     fig.update_layout(xaxis_title="Spectrum", yaxis_title="Counts")
     return fig.to_json()
 
 
-def find_group_runs(current_run_title, run_rb):
+def which_cycle(input_file):
+    cycle_str_start_pos = input_file.rindex("cycle_") + len("cycle_")
+    return input_file[cycle_str_start_pos:cycle_str_start_pos + 4]
+
+
+def find_group_runs(current_run_title, run_rb, input_file):
     """
     Queries the JournalViewer to find runs in the RB number that have the same title
     """
-    current_title, _ = current_run_title.split(" th")
-    journal_ws = ISISJournalGetExperimentRuns("20_3", run_rb, "INTER")
-
     group_runs = []
-    for i in range(journal_ws.rowCount()):
-        _, group_run_number, group_run_title = journal_ws.row(i).values()
+    current_title = ""
+    cycle = which_cycle(input_file)
+    try:
+        current_title = current_run_title[:current_run_title.lower().
+                                          index(" th=")]
+        journal_ws = ISISJournalGetExperimentRuns(cycle, run_rb, "INTER")
 
-        if current_title in group_run_title:
-            group_runs.append(group_run_number)
-    return group_runs
+        for i in range(journal_ws.rowCount()):
+            _, group_run_number, group_run_title = journal_ws.row(i).values()
+
+            if current_title in group_run_title:
+                group_runs.append(group_run_number)
+    except:
+        print('Title not formatted for NR workspace so runs not grouped.')
+    return group_runs, current_title
 
 
-def plot_group_runs(group_run_numbers: List[int], fig, ax):
+def plot_group_runs(group_run_numbers: List[int], group_name, run_rb: str,
+                    current_run_number, local_output_dir):
+    fig = go.Figure()
+    fig.update_layout(yaxis={'exponentformat': 'power'},
+                      margin=dict(l=100, r=20, t=20, b=20),
+                      modebar={'orientation': 'v'},
+                      width=1000,
+                      height=500)
     for run in group_run_numbers:
-        ws = Load()
-        ax.loglog(ws)
+        if run == current_run_number:
+            # when trying to load the current run, it has not yet been copied onto CEPH
+            # and is only available on the local machine, inside local_output_dir
+            #expected_location = f"{local_output_dir}"
+            ## Change to test the loading:
+            expected_location = f"/instrument/INTER/RBNumber/RB{run_rb}/single_angles"
+            print(os.listdir(expected_location))
+        else:
+            ## not loading the current run - the data should be on CEPH
+            # run_ceph_folder = f"/instrument/INTER/RBNumber/RB{run_rb}/autoreduced/{run}"
+            ## use the newest version available for the run
+            # newest_run_version = sorted(os.listdir(run_ceph_folder))[-1]
+            # expected_location = f"{run_ceph_folder}/{newest_run_version}"
+            ## Change to test the loading:
+            expected_location = f"/instrument/INTER/RBNumber/RB{run_rb}/single_angles"
 
-    ax.title()
+        #ws = Load(f"{expected_location}/IvsQ_binned_{run}.nxs")
+        ## Change to test the loading:
+        ws = Load(f"{expected_location}/IvsQ_binned_{run}.dat")
+        fig.add_trace(
+            go.Scatter(
+                x=ws.dataX(0),
+                y=ws.dataY(0),
+                error_y=dict(
+                    type='data',  # value of error bar given in data coordinates
+                    array=ws.dataE(0),
+                    visible=True),
+                name=run))
+
+    fig.update_xaxes(type="log")
+    fig.update_yaxes(type="log")
+    #fig.update_layout(xaxis_title="q (r’$\AA$’^{-1})", yaxis_title="Reflectivity")
+
+    return fig.to_json() ## Add a to_image too?
 
 
 def find_settings_json(web_settings_json: str,
