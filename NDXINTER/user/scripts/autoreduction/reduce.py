@@ -1,5 +1,6 @@
 import sys
 from typing import List, Optional, Tuple
+from numpy.core.numeric import full
 import plotly.graph_objs as go
 import plotly.express as px
 
@@ -36,55 +37,51 @@ def main(input_file, output_dir):
 
     input_workspace, datafile_name = load_workspace(input_file)
     flood_workspace = Load(advanced_params["flood_workspace"])
-    fig, (det_image_ax,
-          spec_pixel_ax) = plt.subplots(figsize=(13, 4.8),
-                                        ncols=2,
-                                        subplot_kw={'projection': 'mantid'})
-    fig.suptitle(input_workspace.getTitle())
+    matplotlib_figure, (det_image_ax, spec_pixel_ax) = plt.subplots(figsize=(13, 4.8),
+                                                                    ncols=2,
+                                                                    subplot_kw={'projection': 'mantid'})
+    matplotlib_figure.suptitle(input_workspace.getTitle())
 
-    plot_detector_image(input_workspace, fig, det_image_ax)
-    plotly_fig = plot_specular_pixel_check(input_workspace, flood_workspace,
-                                           spec_pixel_ax)
-    with open(os.path.join(output_dir, f"{datafile_name}_peak.json"),
-              'w') as figfile:
-        figfile.write(plotly_fig)
-    fig.savefig(os.path.join(output_dir, f"{datafile_name}.png"))
+    plot_detector_image(input_workspace, matplotlib_figure, det_image_ax)
+    plotly_fig = plot_specular_pixel_check(input_workspace, flood_workspace, spec_pixel_ax)
+    save_plotly_figure(plotly_fig, datafile_name, "peak", output_dir)
+    matplotlib_figure.savefig(os.path.join(output_dir, f"{datafile_name}.png"))
 
-    run_title = input_workspace.getTitle()
+    full_run_title = input_workspace.getTitle()
     run_rb = str(input_workspace.getRun().getLogData("rb_proposal").value)
     run_number = str(input_workspace.getRun().getLogData("run_number").value)
-    print("Run title:", run_title, "RB:", run_rb)
-    settings_file = find_settings_json(
-        standard_params['path_to_json_settings_file'],
-        f"/instrument/INTER/RBNumber/RB{run_rb}")
+
+    print("Run title:", full_run_title, "RB:", run_rb)
 
     # only reduce if not a transmission run
-    if settings_file and "trans" not in run_title.lower():
-        run_reduction(input_workspace, datafile_name, settings_file,
-                      output_dir)
+    if "trans" in full_run_title.lower():
+        print("Skipping reduction due to having 'trans' in the title: {full_run_title}")
     else:
-        print(
-            "Skipping reduction due to",
-            "missing settings file" if settings_file is None else
-            f"this having 'trans' in the title: {run_title}")
+        sample_name = get_sample_name(full_run_title)
+        settings_file = find_settings_json(sample_name, standard_params['JSON Settings File'],
+                                           f"/instrument/INTER/RBNumber/RB{run_rb}")
 
-    group_run_numbers, group_name = find_group_runs(run_title, run_rb,
-                                                    input_file)
-    print("Found group_run_numbers:", group_run_numbers)
+        output_workspace_binned = None
+        if settings_file:
+            output_workspace_binned = run_reduction(input_workspace, datafile_name, settings_file, output_dir)
+        else:
+            print("Skipping reduction due to missing settings file")
+        group_run_numbers = find_group_runs(sample_name, run_rb, input_file)
+        print("Found group_run_numbers:", group_run_numbers)
 
-    if group_run_numbers:
-        try:
-            group_plot_fig = plot_group_runs(group_run_numbers, group_name,
-                                             run_rb, run_number, output_dir)
-            with open(os.path.join(output_dir, f"{datafile_name}_group.json"),
-                      'w') as figfile:
-                figfile.write(group_plot_fig)
-        except Exception as err:
-            print("Encountered error while trying to plot group:", err)
+        if group_run_numbers:
+            try:
+                group_plot_fig = plot_group_runs(group_run_numbers, sample_name, run_rb, run_number,
+                                                 output_workspace_binned)
+                if group_plot_fig:
+                    with open(os.path.join(output_dir, f"{datafile_name}_group.json"), 'w') as figfile:
+                        figfile.write(group_plot_fig)
+            except Exception as err:
+                print("Encountered error while trying to plot group:", err)
 
 
-def run_reduction(input_workspace: EventWorkspace, workspace_name: str,
-                  settings_file: str, output_dir: str):  # Run reduction
+def run_reduction(input_workspace: EventWorkspace, workspace_name: str, settings_file: str,
+                  output_dir: str):  # Run reduction
     # Get the angle
     angle = get_angle(input_workspace)
     params = find_angle_parameters_from_settings_json(settings_file, angle)
@@ -96,14 +93,10 @@ def run_reduction(input_workspace: EventWorkspace, workspace_name: str,
         "SecondTransmissionRunList": params.second_transmission_run_list,
         "ThetaIn": angle,
         "DetectorCorrectionType": params.detector_correction_type,
-        "MonitorBackgroundWavelengthMin":
-        params.monitor_background_wavelength_min,
-        "MonitorBackgroundWavelengthMax":
-        params.monitor_background_wavelength_max,
-        "MonitorIntegrationWavelengthMin":
-        params.monitor_integration_wavelength_min,
-        "MonitorIntegrationWavelengthMax":
-        params.monitor_integration_wavelength_max,
+        "MonitorBackgroundWavelengthMin": params.monitor_background_wavelength_min,
+        "MonitorBackgroundWavelengthMax": params.monitor_background_wavelength_max,
+        "MonitorIntegrationWavelengthMin": params.monitor_integration_wavelength_min,
+        "MonitorIntegrationWavelengthMax": params.monitor_integration_wavelength_max,
         "WavelengthMin": params.wavelength_min,
         "WavelengthMax": params.wavelength_max,
         "I0MonitorIndex": params.i_zero_monitor_index,
@@ -111,8 +104,7 @@ def run_reduction(input_workspace: EventWorkspace, workspace_name: str,
         "StartOverlap": params.start_overlap,
         "EndOverlap": params.end_overlap,
         "ScaleRHSWorkspace": params.scale_rhs_workspace,
-        "TransmissionProcessingInstructions":
-        params.transmission_processing_instructions,
+        "TransmissionProcessingInstructions": params.transmission_processing_instructions,
         "ProcessingInstructions": params.processing_instructions
     }
     alg.setProperties(properties)
@@ -122,13 +114,13 @@ def run_reduction(input_workspace: EventWorkspace, workspace_name: str,
     OutputWorkspace = alg.getPropertyValue("OutputWorkspace")
     OutputWorkspaceBinned = alg.getPropertyValue("OutputWorkspaceBinned")
 
-    SaveNexus(OutputWorkspace,
-              os.path.join(output_dir, OutputWorkspace + ".nxs"))
-    SaveNexus(OutputWorkspaceBinned,
-              os.path.join(output_dir, OutputWorkspaceBinned + ".nxs"))
+    SaveNexus(OutputWorkspace, os.path.join(output_dir, OutputWorkspace + ".nxs"))
+    SaveNexus(OutputWorkspaceBinned, os.path.join(output_dir, OutputWorkspaceBinned + ".nxs"))
 
     # Save a copy of the .json settings file
     copy(settings_file, output_dir)
+
+    return OutputWorkspaceBinned
 
 
 def load_workspace(input_file) -> Tuple[EventWorkspace, str]:
@@ -138,17 +130,18 @@ def load_workspace(input_file) -> Tuple[EventWorkspace, str]:
     :return: Average (mean) angle from motor position readback
     """
     filename = os.path.basename(input_file)
-    run_str = filename.split("INTER")[1].split(".")[0].strip("0")
-    name = instrument + run_str
-    ws = LoadISISNexus(Filename=name, OutputWorkspace='TOF_' + run_str)
+    run_str = filename.split("INTER")[1].split(".")[0]
+    ws = LoadISISNexus(Filename=input_file, OutputWorkspace='TOF_' + run_str)
     return ws, filename
+
+
+def get_sample_name(full_run_title):
+    return full_run_title[:full_run_title.lower().index(" th=")]
 
 
 def get_angle(workspace: EventWorkspace):
     # Filter the logs for all angles starting from time 0 and use the average of the returned angles
-    (angle_list, average_angle) = FilterLogByTime(workspace,
-                                                  'Theta',
-                                                  StartTime=0)
+    (angle_list, average_angle) = FilterLogByTime(workspace, 'Theta', StartTime=0)
     return average_angle
 
 
@@ -195,8 +188,7 @@ def find_angle_parameters_from_settings_json(json_input, angle):
     if not angle_found:
         for row in rows:
             if row[0] == "":
-                angle_found, params = get_per_angle_defaults_params(
-                    row, params)
+                angle_found, params = get_per_angle_defaults_params(row, params)
                 break
 
     if not angle_found:
@@ -257,8 +249,7 @@ def plot_detector_image(input_workspace: EventWorkspace, fig, ax):
     ax.set_title("Detector image")
 
 
-def plot_specular_pixel_check(input_workspace: EventWorkspace,
-                              flood_workspace: EventWorkspace, ax):
+def plot_specular_pixel_check(input_workspace: EventWorkspace, flood_workspace: EventWorkspace, ax):
     flooded_ws = ApplyFloodWorkspace(input_workspace, flood_workspace)
 
     integrated = Integration(flooded_ws,
@@ -270,16 +261,11 @@ def plot_specular_pixel_check(input_workspace: EventWorkspace,
     integrated_transposed = Transpose(integrated)
 
     def _1gaussian(x, ampl, cent, sigma):
-        return ampl * (1 / sigma *
-                       (np.sqrt(2 * np.pi))) * (np.exp(-((x - cent)**2) /
-                                                       (2 * sigma)**2))
+        return ampl * (1 / sigma * (np.sqrt(2 * np.pi))) * (np.exp(-((x - cent)**2) / (2 * sigma)**2))
 
     xval = integrated_transposed.readX(0)
     yval = integrated_transposed.readY(0)
-    popt_gauss, pcov_gauss = optimize.curve_fit(_1gaussian,
-                                                xval,
-                                                yval,
-                                                p0=[56000, 86, 0.8])
+    popt_gauss, pcov_gauss = optimize.curve_fit(_1gaussian, xval, yval, p0=[56000, 86, 0.8])
     perr_gauss = np.sqrt(np.diag(pcov_gauss))
 
     fit_yvals = _1gaussian(xval, *popt_gauss)
@@ -292,25 +278,25 @@ def plot_specular_pixel_check(input_workspace: EventWorkspace,
     max_pos = fit_yvals.argmax()
     annot_y = fit_yvals[max_pos]
     annot_x = xval[max_pos]
-    ax.annotate(f"X:{annot_x}, Y:{annot_y}",
-                xy=(annot_x, annot_y),
-                xytext=(annot_x * 1.02, annot_y))
+    ax.annotate(f"X:{annot_x}, Y:{annot_y}", xy=(annot_x, annot_y), xytext=(annot_x * 1.02, annot_y))
     ax.minorticks_on()
     ax.grid(True, which="both")
     ax.set_title("Specular pixel")
 
     # make interactive plotly figure
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(x=xval,
-                   y=yval,
-                   name="Data",
-                   mode="markers",
-                   marker_symbol=4))
+    fig.add_trace(go.Scatter(x=xval, y=yval, name="Data", mode="markers", marker_symbol=4))
     fig.add_trace(go.Scatter(x=xval, y=fit_yvals, mode="lines", name="Fit"))
     fig.add_vline(x=86, line_dash="dash", line_color="blue")
-    fig.update_layout(xaxis_title="Spectrum", yaxis_title="Counts")
-    return fig.to_json()
+    fig.update_layout(xaxis_title="Spectrum", yaxis_title="Counts", width=600, title_text="Specular pixel", title_x=0.5)
+    return fig
+
+
+def save_plotly_figure(plotly_fig, datafile_name, plot_type_suffix, output_dir):
+    with open(os.path.join(output_dir, f"{datafile_name}_{plot_type_suffix}.json"), 'w') as figfile:
+        figfile.write(plotly_fig.to_json())
+
+    # plotly_fig.write_image(os.path.join(output_dir, f"plotly_{plot_type_suffix}_{datafile_name}.png"))
 
 
 def which_cycle(input_file):
@@ -318,56 +304,97 @@ def which_cycle(input_file):
     return input_file[cycle_str_start_pos:cycle_str_start_pos + 4]
 
 
-def find_group_runs(current_run_title, run_rb, input_file):
+def find_group_runs(sample_name, run_rb, input_file):
     """
     Queries the JournalViewer to find runs in the RB number that have the same title
     """
     group_runs = []
-    current_title = ""
     cycle = which_cycle(input_file)
     try:
-        current_title = current_run_title[:current_run_title.lower().
-                                          index(" th=")]
         journal_ws = ISISJournalGetExperimentRuns(cycle, run_rb, "INTER")
 
         for i in range(journal_ws.rowCount()):
             _, group_run_number, group_run_title = journal_ws.row(i).values()
 
-            if current_title in group_run_title:
+            if sample_name in group_run_title:
                 group_runs.append(group_run_number)
     except:
         print('Title not formatted for NR workspace so runs not grouped.')
-    return group_runs, current_title
+    return group_runs
 
 
-def plot_group_runs(group_run_numbers: List[int], group_name, run_rb: str,
-                    current_run_number, local_output_dir):
+def find_pre_reduced_run(run_number, run_rb):
+    """
+    Find the file for a manually reduced run that has been saved to the RB folder inside single_angles
+    """
+    expected_location = web_var.standard_vars["Pre-reduced single angles"].format(run_rb)
+
+    full_path = os.path.join(expected_location, f"IvsQ_binned_{run_number}.dat")
+    if os.path.isfile(full_path):
+        return full_path
+    else:
+        return None
+
+
+def find_autoreduced_run(run_number, run_rb):
+    """
+    Find the file saved from a previous autoreduction
+    """
+    ## not loading the current run - the data should be on CEPH
+    run_ceph_folder = f"/instrument/INTER/RBNumber/RB{run_rb}/autoreduced/{run_number}"
+    ## use the newest version available for the run
+    newest_run_version = sorted(os.listdir(run_ceph_folder))[-1]
+    expected_location = f"{run_ceph_folder}/{newest_run_version}"
+    full_path = os.path.join(expected_location, f"IvsQ_binned_{run_number}.nxs")
+    if os.path.isfile(full_path):
+        return full_path
+    else:
+        return None
+
+
+def find_reduced_run(run_number, run_rb, current_run_number, output_workspace_binned):
+    """
+    Contains the logic to find the reduced run.
+
+    First checks for a manually pre-reduced run inside RB/single_angles.
+
+    If not found, then looks for an autoreduced run.
+    """
+    # try to find the file in a pre-reduced single_angles folder
+    run_file_path = find_pre_reduced_run(run_number, run_rb)
+
+    # did not find a pre-reduced run, try to load an autoreduced one
+    if not run_file_path:
+        if run_number == current_run_number:
+            # if we are looking for the current run number, we have this calculated in a local variable
+            return output_workspace_binned
+        else:
+            # only search for a file if the run is not the current one
+            run_file_path = find_autoreduced_run(run_number, run_rb)
+
+    # found a reduced run at some location, load it into a workspace and return it
+    if run_file_path:
+        ws = Load(run_file_path)
+        return ws
+    else:
+        return None
+
+
+def plot_group_runs(group_run_numbers: List[int], group_name, run_rb: str, current_run_number, output_workspace_binned):
     fig = go.Figure()
     fig.update_layout(yaxis={'exponentformat': 'power'},
                       margin=dict(l=100, r=20, t=20, b=20),
                       modebar={'orientation': 'v'},
                       width=1000,
                       height=500)
-    for run in group_run_numbers:
-        if run == current_run_number:
-            # when trying to load the current run, it has not yet been copied onto CEPH
-            # and is only available on the local machine, inside local_output_dir
-            #expected_location = f"{local_output_dir}"
-            ## Change to test the loading:
-            expected_location = f"/instrument/INTER/RBNumber/RB{run_rb}/single_angles"
-            print(os.listdir(expected_location))
-        else:
-            ## not loading the current run - the data should be on CEPH
-            # run_ceph_folder = f"/instrument/INTER/RBNumber/RB{run_rb}/autoreduced/{run}"
-            ## use the newest version available for the run
-            # newest_run_version = sorted(os.listdir(run_ceph_folder))[-1]
-            # expected_location = f"{run_ceph_folder}/{newest_run_version}"
-            ## Change to test the loading:
-            expected_location = f"/instrument/INTER/RBNumber/RB{run_rb}/single_angles"
-
-        #ws = Load(f"{expected_location}/IvsQ_binned_{run}.nxs")
-        ## Change to test the loading:
-        ws = Load(f"{expected_location}/IvsQ_binned_{run}.dat")
+    anything_plotted = False
+    for run_number in group_run_numbers:
+        ws = find_reduced_run(run_number, run_rb, current_run_number, output_workspace_binned)
+        if not ws:
+            # did not find anything to plot for this run
+            print("Did not find any reduced files for run", run_number)
+            continue
+        anything_plotted = True
         fig.add_trace(
             go.Scatter(
                 x=ws.dataX(0),
@@ -380,13 +407,14 @@ def plot_group_runs(group_run_numbers: List[int], group_name, run_rb: str,
 
     fig.update_xaxes(type="log")
     fig.update_yaxes(type="log")
-    #fig.update_layout(xaxis_title="q (r’$\AA$’^{-1})", yaxis_title="Reflectivity")
+    # fig.update_layout(xaxis_title="q (r'$\AA$'^{-1})", yaxis_title="Reflectivity")
+    if anything_plotted:
+        return fig.to_json()  ## Add a to_image too?
+    else:
+        return None
 
-    return fig.to_json() ## Add a to_image too?
 
-
-def find_settings_json(web_settings_json: str,
-                       output_rb_dir: str) -> Optional[str]:
+def find_settings_json(sample_name, web_settings_json: str, output_rb_dir: str) -> Optional[str]:
     """
     Tries to find a settings.json that should be used for this reduction.
 
@@ -396,7 +424,13 @@ def find_settings_json(web_settings_json: str,
     if web_settings_json:
         return web_settings_json
 
-    # if not - check if a settings.json exists in the experiment's CEPH folder
+    # If not - check if a {sample_name}.json exists in the experiment's CEPH folder.
+    # This is a small workaround as the json files cannot describe angles for multiple samples
+    settings_for_sample_name = os.path.join(output_rb_dir, f"{sample_name}.json")
+    if os.path.exists(settings_for_sample_name):
+        return settings_for_sample_name
+
+    # if not - check if a general, experiment-wide settings.json exists in the CEPH folder
     settings_in_rb_dir = os.path.join(output_rb_dir, "settings.json")
     if os.path.exists(settings_in_rb_dir):
         return settings_in_rb_dir

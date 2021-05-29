@@ -1,5 +1,6 @@
 standard_vars = {
-    "path_to_json_settings_file": ""
+    "JSON Settings File": "",
+    "Pre-reduced single angles": "/instrument/INTER/RBNumber/RB{}/single_angles"
     # "analysis_mode": "MultiDetectorAnalysis",
     # "first_transmission_run_list" : "INTER00061705",
     # "second_transmission_run_list" : "INTER00061669",
@@ -9,8 +10,7 @@ standard_vars = {
     # "end_overlap" : 12.0
 }
 advanced_vars = {
-    "flood_workspace":
-    "/isis/NDXINTER/User/INTER/FloodFiles/Flood_cycle_21_1.nxs"
+    "flood_workspace": "/isis/NDXINTER/User/INTER/FloodFiles/Flood_cycle_21_1.nxs"
     # "monitor_integration_wavelength_min" : 4.0,
     # "monitor_integration_wavelength_max" : 10.0,
     # "monitor_background_wavelength_min": 17.0,
@@ -23,11 +23,11 @@ advanced_vars = {
 
 variable_help = {
     "standard_vars": {
-        "path_to_json_settings_file":
+        "JSON Settings File":
         "Path to a settings.json saved on CEPH from the Mantid Reflectometry GUI, such as /instrument/INTER/RBNumber/RB1234567/settings.json",
+        "Pre-reduced single angles": "Path where pre-reduced single angle files can be found",
     },
     "advanced_vars": {
-        "flood_workspace":
-        "Path to a flood workspace that will be used for Flood corrections"
+        "flood_workspace": "Path to a flood workspace that will be used for Flood corrections"
     },
 }
